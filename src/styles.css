@@ -1,0 +1,11 @@
+html, body { margin: 0; padding: 0; background: #f5f1ea; }
+* { box-sizing: border-box; }
+
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .app-wrap { padding: 0 !important; }
+  .preview-col { flex: 1 1 100% !important; min-width: 0 !important; }
+  .card { box-shadow: none !important; border: 1px solid #e2dacd !important; break-inside: avoid; }
+  h1 { font-size: 18px !important; }
+}

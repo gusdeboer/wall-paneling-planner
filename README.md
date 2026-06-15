@@ -1,25 +1,33 @@
 # Wall Paneling Planner
 
-A single-file, browser-based tool for designing decorative wall paneling (wainscoting, picture-frame moulding, board-and-batten, grids, and feature walls). Enter your wall dimensions, pick a layout and style, preview it on a scaled drawing of your wall — or on a photo of the real wall — and get an accurate cut list and total moulding length to take to the shop.
+A browser-based tool for designing decorative wall paneling (wainscoting, picture-frame moulding, board-and-batten, grids, and feature walls). Enter your wall dimensions, pick a layout and style, preview it on a scaled drawing of your wall — or on a photo of the real wall — and get an accurate cut list, shopping list, and total moulding length to take to the shop.
 
-No build step, no backend, no dependencies to install. It's one `index.html` file that runs entirely in the browser.
-
+No backend, and no data ever leaves your device. The app builds into a single self-contained HTML file (React inlined, no CDN) that loads instantly and works offline.
 
 View [Wall Paneling Planner](https://gusdeboer.github.io/wall-paneling-planner/)
 
 ---
 
-## Live demo / hosting
+## Develop & build
 
-This is designed to run on **GitHub Pages** (or any static host).
+```bash
+npm install
+npm run dev      # local dev server with hot reload
+npm run build    # outputs a single self-contained dist/index.html
+npm run preview  # serve the built file
+```
 
-1. Create a GitHub repository.
-2. Add the `index.html` file to the root of the repo and commit.
-3. Go to **Settings → Pages**.
-4. Set **Source** to *Deploy from a branch*, branch `main`, folder `/ (root)`, and save.
-5. After ~1 minute the site is live at `https://<your-username>.github.io/<repo-name>/`.
+The build inlines all JavaScript and CSS into `dist/index.html`, so the result has **no external dependencies** — open it directly in a browser or drop it on any static host.
 
-It also works by simply opening `index.html` directly in any modern browser — no server required.
+## Hosting on GitHub Pages
+
+This repo ships a GitHub Actions workflow (`.github/workflows/deploy.yml`) that builds and deploys automatically:
+
+1. Push to the `main` branch.
+2. Go to **Settings → Pages** and set **Source** to **GitHub Actions** (one time).
+3. After the workflow runs, the site is live at `https://<your-username>.github.io/<repo-name>/`.
+
+Because everything is inlined, the page base path doesn't matter — the same built file also works opened straight from disk.
 
 ---
 
@@ -37,7 +45,7 @@ Below the preview you get a **cut list** (the exact width and height of every pa
 ## Controls
 
 ### Units
-Switch between **Centimeters** and **Inches**. Every measurement in the tool, the cut list, and the export use the selected unit. Totals are also shown in meters (cm mode) or feet (inches mode).
+Switch between **Centimeters** and **Inches**. Switching **converts every existing measurement** (a 400 cm wall becomes ~157 in, not 400 in), so your design keeps its real-world size. Totals are also shown in meters (cm mode) or feet (inches mode).
 
 ### Wall dimensions
 - **Wall width** — the full width of the wall.
@@ -87,7 +95,7 @@ The empty border between the panel block and the wall edges:
 - **Top** — space from the ceiling to the top of the panels.
 - **Bottom** — space from the floor to the bottom of the panels.
 - **Sides** — space from each side wall to the outermost panels.
-- **Keep left/right margins equal** — keeps the layout symmetrical (recommended).
+- **Keep left/right margins equal** — when on, both sides use the same margin (recommended for symmetry). Turn it off to reveal separate **Left** and **Right** fields for an asymmetric layout.
 
 ### Moulding style
 The visual profile of the trim:
@@ -140,8 +148,11 @@ Beneath the preview:
 - **Moulding profile** — the moulding width in use.
 - **Total moulding length** — the sum of every panel's perimeter (plus the chair-rail run in Wainscot mode), shown in your unit and in meters/feet. Use this to estimate how much trim to purchase.
 - **Wall area** — total wall area in m² or ft².
+- **Lengths to buy** — given the **stock length per piece** (e.g. moulding sold in 240 cm / 8 ft sticks), the number of pieces you need to buy, with the resulting **waste %**.
+- **Estimated cost** — if you enter a **price per length**, the total material cost (pieces × price). Hidden when price is 0.
 - A scrollable **per-panel table** listing the exact width and height of each panel. In Free placement mode, clicking a row selects that panel.
-- **Export .txt** — downloads the full cut list (wall size, layout, moulding width, every panel dimension, and totals) as a plain text file.
+- **Print / PDF** — opens the browser print dialog with a clean layout (preview + cut list only) so you can print it or save a PDF.
+- **Export .txt** — downloads the full cut list (wall size, layout, moulding width, every panel dimension, buy list, and totals) as a plain text file.
 
 ---
 
@@ -163,12 +174,10 @@ This is the trade-off for a tool that needs no server or account.
 
 ## Technical notes
 
-- Built as a single HTML file using **React 18** and **Babel Standalone** loaded from a CDN, so the JSX compiles in the browser. This means a one-time internet connection is needed to load those libraries, and there's a brief (~1 second) compile delay on first load.
+- Built with **React 18** and **Vite**. `vite-plugin-singlefile` inlines all JS and CSS into one `dist/index.html`, so the deployed app has no CDN dependency, loads instantly, and works offline.
+- Source lives in `src/main.jsx` (the app) and `src/styles.css` (base + print styles); `index.html` is the Vite entry template.
 - All state is held in the browser; the only persistence is `localStorage` for saved designs.
 - No data ever leaves your device — photos, dimensions, and designs are all local.
-
-### Want faster loading?
-For an instant-loading, CDN-free version, the same component can be built with **Vite** (`npm create vite`), which compiles everything into static files ahead of time. That also deploys to GitHub Pages — just set Vite's `base` option to `/<repo-name>/`.
 
 ---
 
