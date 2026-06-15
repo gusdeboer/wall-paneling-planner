@@ -19,6 +19,12 @@ const store = {
 
 const num = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
 const styleMouldFactor = { classic: 1, double: 0.7, beveled: 1.6, thin: 0.5 };
+const styles = {
+  classic: { inset: 0, label: "Classic (single trim)" },
+  double: { inset: 0.3, label: "Double trim" },
+  beveled: { inset: 0, label: "Bold / beveled" },
+  thin: { inset: 0, label: "Thin minimalist" },
+};
 
 // ---- shared layout engine (used by the main preview AND the saved thumbnails) ----
 // Takes real-world dimensions and returns panel rectangles in those same units.
@@ -125,13 +131,6 @@ function WallPanelingPlanner() {
   ];
   const trimPresets = ["#ffffff", "#f3ece1", "#e8e0d2", "#cdb6a3", "#3d3833", "#2f3338"];
 
-  const styles = {
-    classic: { inset: 0, label: "Classic (single trim)" },
-    double: { inset: 0.3, label: "Double trim" },
-    beveled: { inset: 0, label: "Bold / beveled" },
-    thin: { inset: 0, label: "Thin minimalist" },
-  };
-
   const W = num(wallW), H = num(wallH);
   const svgW = 1600, pad = 46;
   const scale = W > 0 ? (svgW - pad * 2) / W : 1;
@@ -155,6 +154,15 @@ function WallPanelingPlanner() {
       setLoadingSaved(false);
     })();
   }, []);
+
+  // Keep free-placement panels inside the wall when its dimensions shrink.
+  useEffect(() => {
+    if (!freeMode || W <= 0 || H <= 0) return;
+    setPanels((prev) => prev.map((p) => {
+      const w = Math.min(p.w, W), h = Math.min(p.h, H);
+      return { ...p, w, h, x: Math.max(0, Math.min(p.x, W - w)), y: Math.max(0, Math.min(p.y, H - h)) };
+    }));
+  }, [W, H, freeMode]);
 
   // Switching units converts every length so a 400 cm wall becomes ~157 in, not 400 in.
   const changeUnit = (u) => {
@@ -189,7 +197,11 @@ function WallPanelingPlanner() {
 
   const saveLayout = async () => {
     const id = `layout:${Date.now()}`;
-    const data = { id, name: `Design ${saved.length + 1}`, ts: Date.now(), state: snapshot() };
+    const nextNum = saved.reduce((m, s) => {
+      const n = parseInt(String(s.name).replace(/[^0-9]/g, ""), 10);
+      return Number.isFinite(n) ? Math.max(m, n) : m;
+    }, 0) + 1;
+    const data = { id, name: `Design ${nextNum}`, ts: Date.now(), state: snapshot() };
     try { await store.set(id, JSON.stringify(data)); } catch {}
     setSaved((p) => [...p, data]);
   };
@@ -333,43 +345,6 @@ function WallPanelingPlanner() {
     URL.revokeObjectURL(url);
   };
 
-  const Panel = ({ p, isSel }) => {
-    const x = pad + p.x * scale, y = pad + p.y * scale, w = p.w * scale, h = p.h * scale;
-    const t = Math.max(2, mw * scale);
-    const ins = styles[style].inset > 0 ? t * 2.2 : 0;
-    return (
-      <g onPointerDown={(e) => startDrag(e, p.id, "move")} style={{ cursor: freeMode ? "move" : "default" }}>
-        <rect x={x} y={y} width={w} height={h} fill="transparent" />
-        <rect x={x} y={y} width={w} height={h} fill="none" stroke={trimColor} strokeWidth={t} strokeLinejoin="miter" />
-        <path d={`M${x - t/2},${y - t/2} H${x + w + t/2} M${x - t/2},${y - t/2} V${y + h + t/2}`} stroke="#ffffff" strokeOpacity="0.55" strokeWidth={Math.max(1, t * 0.3)} fill="none" />
-        <path d={`M${x + w + t/2},${y - t/2} V${y + h + t/2} M${x - t/2},${y + h + t/2} H${x + w + t/2}`} stroke="#000000" strokeOpacity="0.18" strokeWidth={Math.max(1, t * 0.3)} fill="none" />
-        {ins > 0 && <rect x={x + ins} y={y + ins} width={Math.max(0, w - ins * 2)} height={Math.max(0, h - ins * 2)} fill="none" stroke={trimColor} strokeWidth={Math.max(1.5, t * 0.6)} />}
-        {isSel && (<>
-          <rect x={x - 3} y={y - 3} width={w + 6} height={h + 6} fill="none" stroke="#c9783a" strokeWidth={2} strokeDasharray="8 5" />
-          <rect x={x + w - 7} y={y + h - 7} width={14} height={14} rx={3} fill="#c9783a" onPointerDown={(e) => startDrag(e, p.id, "resize")} style={{ cursor: "nwse-resize" }} />
-        </>)}
-      </g>
-    );
-  };
-
-  const Field = ({ label, value, set, min = 0, suffix = unit, placeholder }) => (
-    <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}>
-      <span style={{ color: "#6b6259", fontWeight: 500 }}>{label}</span>
-      <div style={{ position: "relative" }}>
-        <input type="number" value={value} min={min} placeholder={placeholder} onChange={(e) => set(e.target.value)}
-          style={{ width: "100%", padding: "8px 36px 8px 10px", borderRadius: 8, border: "1px solid #ddd5cc", background: "#fff", fontSize: 14, boxSizing: "border-box" }} />
-        <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#a89e92", fontSize: 12 }}>{suffix}</span>
-      </div>
-    </label>
-  );
-
-  const Section = ({ title, children }) => (
-    <div style={{ borderTop: "1px solid #eee6db", paddingTop: 14, marginTop: 14 }}>
-      <span style={{ color: "#6b6259", fontWeight: 600, fontSize: 12.5, textTransform: "uppercase", letterSpacing: 0.5 }}>{title}</span>
-      <div style={{ marginTop: 10 }}>{children}</div>
-    </div>
-  );
-
   const baseboardPx = num(baseboard) * scale;
   const crownPx = num(crown) * scale;
 
@@ -395,8 +370,8 @@ function WallPanelingPlanner() {
               ))}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-              <Field label="Wall width" value={wallW} set={setWallW} />
-              <Field label="Wall height" value={wallH} set={setWallH} />
+              <Field unit={unit} label="Wall width" value={wallW} set={setWallW} />
+              <Field unit={unit} label="Wall height" value={wallH} set={setWallH} />
             </div>
             <div style={{ background: "#f7f3ec", borderRadius: 10, padding: 12, marginBottom: 4 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -427,10 +402,10 @@ function WallPanelingPlanner() {
               <div style={{ background: "#fff8ef", border: "1px solid #ecdcc6", borderRadius: 10, padding: 12, marginTop: 12 }}>
                 <span style={{ color: "#a8794f", fontWeight: 600, fontSize: 12.5, textTransform: "uppercase", letterSpacing: 0.5 }}>Selected panel</span>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
-                  <Field label="X (from left)" value={Math.round(selPanel.x * 10) / 10} set={(v) => updateSel("x", v)} />
-                  <Field label="Y (from top)" value={Math.round(selPanel.y * 10) / 10} set={(v) => updateSel("y", v)} />
-                  <Field label="Width" value={Math.round(selPanel.w * 10) / 10} set={(v) => updateSel("w", v)} />
-                  <Field label="Height" value={Math.round(selPanel.h * 10) / 10} set={(v) => updateSel("h", v)} />
+                  <Field unit={unit} label="X (from left)" value={Math.round(selPanel.x * 10) / 10} set={(v) => updateSel("x", v)} />
+                  <Field unit={unit} label="Y (from top)" value={Math.round(selPanel.y * 10) / 10} set={(v) => updateSel("y", v)} />
+                  <Field unit={unit} label="Width" value={Math.round(selPanel.w * 10) / 10} set={(v) => updateSel("w", v)} />
+                  <Field unit={unit} label="Height" value={Math.round(selPanel.h * 10) / 10} set={(v) => updateSel("h", v)} />
                 </div>
               </div>
             )}
@@ -442,32 +417,32 @@ function WallPanelingPlanner() {
                 ))}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
-                <Field label={layout === "grid" ? "Columns" : "Number of panels"} value={count} set={setCount} min={1} suffix="" />
-                <Field label="Gap between" value={gap} set={setGap} />
+                <Field unit={unit} label={layout === "grid" ? "Columns" : "Number of panels"} value={count} set={setCount} min={1} suffix="" />
+                <Field unit={unit} label="Gap between" value={gap} set={setGap} />
               </div>
               {layout === "grid" && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-                  <Field label="Rows" value={rows} set={setRows} min={1} suffix="" />
-                  <Field label="Row gap" value={rowGap} set={setRowGap} />
+                  <Field unit={unit} label="Rows" value={rows} set={setRows} min={1} suffix="" />
+                  <Field unit={unit} label="Row gap" value={rowGap} set={setRowGap} />
                 </div>
               )}
               {layout === "two-row" && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-                  <Field label="Base panel height" value={lowerH} set={setLowerH} />
-                  <Field label="Row gap" value={rowGap} set={setRowGap} />
+                  <Field unit={unit} label="Base panel height" value={lowerH} set={setLowerH} />
+                  <Field unit={unit} label="Row gap" value={rowGap} set={setRowGap} />
                 </div>
               )}
               {layout === "wainscot" && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-                  <Field label="Chair rail height" value={chairRail} set={setChairRail} />
+                  <Field unit={unit} label="Chair rail height" value={chairRail} set={setChairRail} />
                 </div>
               )}
               <Section title="Margins from wall edge">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <Field label="Top" value={marginTop} set={setMarginTop} />
-                  <Field label="Bottom" value={marginBottom} set={setMarginBottom} />
-                  <Field label={symLock ? "Sides" : "Left"} value={marginSide} set={setMarginSide} />
-                  {!symLock && <Field label="Right" value={marginRight} set={setMarginRight} />}
+                  <Field unit={unit} label="Top" value={marginTop} set={setMarginTop} />
+                  <Field unit={unit} label="Bottom" value={marginBottom} set={setMarginBottom} />
+                  <Field unit={unit} label={symLock ? "Sides" : "Left"} value={marginSide} set={setMarginSide} />
+                  {!symLock && <Field unit={unit} label="Right" value={marginRight} set={setMarginRight} />}
                 </div>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 12.5, color: "#8a8076", cursor: "pointer" }}>
                   <input type="checkbox" checked={symLock} onChange={(e) => setSymLock(e.target.checked)} /> Keep left/right margins equal
@@ -481,7 +456,7 @@ function WallPanelingPlanner() {
               </select>
             </label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 12 }}>
-              <Field label="Moulding width (profile)" value={mouldingW} set={setMouldingW} />
+              <Field unit={unit} label="Moulding width (profile)" value={mouldingW} set={setMouldingW} />
             </div>
             <Section title="Wall color">
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -501,8 +476,8 @@ function WallPanelingPlanner() {
               </label>
               {showArch && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <Field label="Baseboard height" value={baseboard} set={setBaseboard} />
-                  <Field label="Crown height" value={crown} set={setCrown} />
+                  <Field unit={unit} label="Baseboard height" value={baseboard} set={setBaseboard} />
+                  <Field unit={unit} label="Crown height" value={crown} set={setCrown} />
                 </div>
               )}
             </Section>
@@ -557,7 +532,7 @@ function WallPanelingPlanner() {
                   {guides.map((g, i) => g.x != null
                     ? <line key={i} x1={pad + g.x * scale} y1={pad} x2={pad + g.x * scale} y2={pad + H * scale} stroke="#c9783a" strokeWidth="1" strokeDasharray="4 4" />
                     : <line key={i} x1={pad} y1={pad + g.y * scale} x2={pad + W * scale} y2={pad + g.y * scale} stroke="#c9783a" strokeWidth="1" strokeDasharray="4 4" />)}
-                  {activePanels.map((p) => <Panel key={p.id} p={p} isSel={freeMode && selected === p.id} />)}
+                  {activePanels.map((p) => <Panel key={p.id} p={p} isSel={freeMode && selected === p.id} pad={pad} scale={scale} mw={mw} style={style} trimColor={trimColor} freeMode={freeMode} onStart={startDrag} />)}
                   <line x1={pad} y1={svgH - 16} x2={pad + W * scale} y2={svgH - 16} stroke="#a89e92" strokeWidth="1" />
                   <text x={pad + (W * scale) / 2} y={svgH - 20} textAnchor="middle" fontSize="16" fill="#6b6259">{fmt(W)}</text>
                   <line x1={20} y1={pad} x2={20} y2={pad + H * scale} stroke="#a89e92" strokeWidth="1" />
@@ -584,10 +559,10 @@ function WallPanelingPlanner() {
                 {num(pricePerLen) > 0 && <Row k="Estimated cost" v={buy.cost.toFixed(2)} />}
               </div>
               <div className="no-print" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14, background: "#f7f3ec", borderRadius: 10, padding: 12 }}>
-                <Field label="Stock length per piece" value={stockLen} set={setStockLen} />
-                <Field label="Price per piece" value={pricePerLen} set={setPricePerLen} suffix="" placeholder="0.00" />
+                <Field unit={unit} label="Stock length per piece" value={stockLen} set={setStockLen} />
+                <Field unit={unit} label="Price per piece" value={pricePerLen} set={setPricePerLen} suffix="" placeholder="0.00" />
               </div>
-              <div style={{ maxHeight: 220, overflowY: "auto" }}>
+              <div className="cut-table" style={{ maxHeight: 220, overflowY: "auto" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: "6px 16px", color: "#8a8076", fontWeight: 600, paddingBottom: 6, borderBottom: "1px solid #eee6db", fontSize: 13 }}>
                   <span>#</span><span>Width</span><span>Height</span>
                 </div>
@@ -631,6 +606,50 @@ function WallPanelingPlanner() {
 const btnSm = { padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd5cc", cursor: "pointer", background: "#fff", fontSize: 12.5, fontWeight: 500, color: "#6b6259" };
 const swatchPicker = { width: 30, height: 30, borderRadius: 8, cursor: "pointer", border: "1px dashed #b3a896", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", background: "conic-gradient(from 0deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)" };
 const hiddenColor = { opacity: 0, position: "absolute", inset: 0, width: "100%", height: "100%", cursor: "pointer" };
+
+// Defined at module scope (not inside the component) so their identity is stable
+// across renders — otherwise React would remount each input and steal focus mid-typing.
+function Field({ label, value, set, min = 0, suffix, unit, placeholder }) {
+  const suf = suffix !== undefined ? suffix : unit;
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}>
+      <span style={{ color: "#6b6259", fontWeight: 500 }}>{label}</span>
+      <div style={{ position: "relative" }}>
+        <input type="number" value={value} min={min} placeholder={placeholder} onChange={(e) => set(e.target.value)}
+          style={{ width: "100%", padding: "8px 36px 8px 10px", borderRadius: 8, border: "1px solid #ddd5cc", background: "#fff", fontSize: 14, boxSizing: "border-box" }} />
+        <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#a89e92", fontSize: 12 }}>{suf}</span>
+      </div>
+    </label>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <div style={{ borderTop: "1px solid #eee6db", paddingTop: 14, marginTop: 14 }}>
+      <span style={{ color: "#6b6259", fontWeight: 600, fontSize: 12.5, textTransform: "uppercase", letterSpacing: 0.5 }}>{title}</span>
+      <div style={{ marginTop: 10 }}>{children}</div>
+    </div>
+  );
+}
+
+function Panel({ p, isSel, pad, scale, mw, style, trimColor, freeMode, onStart }) {
+  const x = pad + p.x * scale, y = pad + p.y * scale, w = p.w * scale, h = p.h * scale;
+  const t = Math.max(2, mw * scale);
+  const ins = styles[style].inset > 0 ? t * 2.2 : 0;
+  return (
+    <g onPointerDown={(e) => onStart(e, p.id, "move")} style={{ cursor: freeMode ? "move" : "default" }}>
+      <rect x={x} y={y} width={w} height={h} fill="transparent" />
+      <rect x={x} y={y} width={w} height={h} fill="none" stroke={trimColor} strokeWidth={t} strokeLinejoin="miter" />
+      <path d={`M${x - t/2},${y - t/2} H${x + w + t/2} M${x - t/2},${y - t/2} V${y + h + t/2}`} stroke="#ffffff" strokeOpacity="0.55" strokeWidth={Math.max(1, t * 0.3)} fill="none" />
+      <path d={`M${x + w + t/2},${y - t/2} V${y + h + t/2} M${x - t/2},${y + h + t/2} H${x + w + t/2}`} stroke="#000000" strokeOpacity="0.18" strokeWidth={Math.max(1, t * 0.3)} fill="none" />
+      {ins > 0 && <rect x={x + ins} y={y + ins} width={Math.max(0, w - ins * 2)} height={Math.max(0, h - ins * 2)} fill="none" stroke={trimColor} strokeWidth={Math.max(1.5, t * 0.6)} />}
+      {isSel && (<>
+        <rect x={x - 3} y={y - 3} width={w + 6} height={h + 6} fill="none" stroke="#c9783a" strokeWidth={2} strokeDasharray="8 5" />
+        <rect x={x + w - 7} y={y + h - 7} width={14} height={14} rx={3} fill="#c9783a" onPointerDown={(e) => onStart(e, p.id, "resize")} style={{ cursor: "nwse-resize" }} />
+      </>)}
+    </g>
+  );
+}
 
 function Row({ k, v }) {
   return (
