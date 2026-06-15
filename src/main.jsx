@@ -110,7 +110,8 @@ function WallPanelingPlanner() {
   const [saved, setSaved] = useState([]);
   const [loadingSaved, setLoadingSaved] = useState(true);
   const [stockLen, setStockLen] = useState(240);
-  const [pricePerLen, setPricePerLen] = useState(0);
+  const [pricePerLen, setPricePerLen] = useState("");
+  const [dragging, setDragging] = useState(false);
 
   const svgRef = useRef(null);
   const dragRef = useRef(null);
@@ -182,7 +183,7 @@ function WallPanelingPlanner() {
     setLowerH(s.lowerH); setRowGap(s.rowGap); setRows(s.rows);
     setChairRail(s.chairRail); setWallColor(s.wallColor); setTrimColor(s.trimColor ?? "#ffffff");
     setMouldingW(s.mouldingW ?? 3); setBaseboard(s.baseboard ?? 12); setCrown(s.crown ?? 8);
-    setStockLen(s.stockLen ?? 240); setPricePerLen(s.pricePerLen ?? 0);
+    setStockLen(s.stockLen ?? 240); setPricePerLen(s.pricePerLen ?? "");
     setFreeMode(s.freeMode); setPanels(s.panels || []); setSelected(null);
   };
 
@@ -246,7 +247,7 @@ function WallPanelingPlanner() {
   const startDrag = (e, id, mode = "move") => {
     if (!freeMode) return;
     e.preventDefault(); e.stopPropagation();
-    setSelected(id);
+    setSelected(id); setDragging(true);
     const { ux, uy } = eventToUnits(e);
     const p = panels.find((q) => q.id === id);
     dragRef.current = { id, mode, offX: ux - p.x, offY: uy - p.y, startW: p.w, startH: p.h, sx: ux, sy: uy };
@@ -271,7 +272,7 @@ function WallPanelingPlanner() {
   }, [eventToUnits, W, H, snap, panels]);
 
   const endDrag = useCallback(() => {
-    dragRef.current = null; setGuides([]);
+    dragRef.current = null; setGuides([]); setDragging(false);
     window.removeEventListener("pointermove", onDrag);
     window.removeEventListener("pointerup", endDrag);
   }, [onDrag]);
@@ -351,11 +352,11 @@ function WallPanelingPlanner() {
     );
   };
 
-  const Field = ({ label, value, set, min = 0, suffix = unit }) => (
+  const Field = ({ label, value, set, min = 0, suffix = unit, placeholder }) => (
     <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}>
       <span style={{ color: "#6b6259", fontWeight: 500 }}>{label}</span>
       <div style={{ position: "relative" }}>
-        <input type="number" value={value} min={min} onChange={(e) => set(e.target.value)}
+        <input type="number" value={value} min={min} placeholder={placeholder} onChange={(e) => set(e.target.value)}
           style={{ width: "100%", padding: "8px 36px 8px 10px", borderRadius: 8, border: "1px solid #ddd5cc", background: "#fff", fontSize: 14, boxSizing: "border-box" }} />
         <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#a89e92", fontSize: 12 }}>{suffix}</span>
       </div>
@@ -375,7 +376,14 @@ function WallPanelingPlanner() {
   return (
     <div className="app-wrap" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif", background: "#f5f1ea", padding: 20, color: "#3d3833", minHeight: "100vh" }}>
       <div style={{ width: "100%", margin: "0 auto" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 600, margin: "0 0 4px" }}>Wall Paneling Planner</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 600, margin: "0 0 4px", display: "flex", alignItems: "center", gap: 10 }}>
+          <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" style={{ flex: "0 0 auto" }}>
+            <rect width="32" height="32" rx="6" fill="#e9e2d6" />
+            <rect x="6" y="6" width="8" height="20" fill="none" stroke="#fff" strokeWidth="2" />
+            <rect x="18" y="6" width="8" height="20" fill="none" stroke="#fff" strokeWidth="2" />
+          </svg>
+          Wall Paneling Planner
+        </h1>
         <p style={{ margin: "0 0 20px", color: "#8a8076", fontSize: 14 }}>Design your panel layout, see it on your wall, and get an accurate cut list.</p>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
           <div className="no-print" style={{ flex: "0 0 340px", minWidth: 300, background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
@@ -514,7 +522,12 @@ function WallPanelingPlanner() {
             </Section>
           </div>
           <div className="preview-col" style={{ flex: "1 1 600px", minWidth: 340 }}>
-            <div className="card" style={{ background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+            <div className="card" style={{ background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: freeMode ? "2px solid #c9a98a" : "2px solid transparent" }}>
+              {freeMode && (
+                <div className="no-print" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, padding: "6px 10px", borderRadius: 8, background: "#fbf3e9", color: "#a8794f", fontSize: 12.5, fontWeight: 600 }}>
+                  <span style={{ fontSize: 14 }}>✦</span> Editing panels — drag to move, drag the corner handle to resize
+                </div>
+              )}
               {valid ? (
                 <svg ref={svgRef} viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: "auto", display: "block", touchAction: "none" }}
                   onPointerDown={(e) => { if (e.target.dataset.wall) setSelected(null); }}>
@@ -528,9 +541,16 @@ function WallPanelingPlanner() {
                       <line x1={pad} y1={pad + 1} x2={pad + W * scale} y2={pad + 1} stroke="#000" strokeOpacity="0.05" strokeWidth="2" />
                     </g>
                   )}
-                  {freeMode && num(snap) > 0 && Array.from({ length: Math.floor(W / num(snap)) }, (_, i) => (
-                    <line key={`gx${i}`} x1={pad + (i + 1) * num(snap) * scale} y1={pad} x2={pad + (i + 1) * num(snap) * scale} y2={pad + H * scale} stroke="#000" strokeOpacity="0.04" strokeWidth="1" />
-                  ))}
+                  {freeMode && dragging && num(snap) > 0 && (
+                    <g>
+                      {Array.from({ length: Math.floor(W / num(snap)) }, (_, i) => (
+                        <line key={`gx${i}`} x1={pad + (i + 1) * num(snap) * scale} y1={pad} x2={pad + (i + 1) * num(snap) * scale} y2={pad + H * scale} stroke="#000" strokeOpacity="0.03" strokeWidth="1" />
+                      ))}
+                      {Array.from({ length: Math.floor(H / num(snap)) }, (_, i) => (
+                        <line key={`gy${i}`} x1={pad} y1={pad + (i + 1) * num(snap) * scale} x2={pad + W * scale} y2={pad + (i + 1) * num(snap) * scale} stroke="#000" strokeOpacity="0.03" strokeWidth="1" />
+                      ))}
+                    </g>
+                  )}
                   {!freeMode && layout === "wainscot" && autoCalc.chairRailY != null && (
                     <rect x={pad} y={pad + autoCalc.chairRailY * scale - Math.max(2, mw * scale) / 2} width={W * scale} height={Math.max(2, mw * scale)} fill={trimColor} />
                   )}
@@ -565,7 +585,7 @@ function WallPanelingPlanner() {
               </div>
               <div className="no-print" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14, background: "#f7f3ec", borderRadius: 10, padding: 12 }}>
                 <Field label="Stock length per piece" value={stockLen} set={setStockLen} />
-                <Field label="Price per length" value={pricePerLen} set={setPricePerLen} suffix="" />
+                <Field label="Price per piece" value={pricePerLen} set={setPricePerLen} suffix="" placeholder="0.00" />
               </div>
               <div style={{ maxHeight: 220, overflowY: "auto" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: "6px 16px", color: "#8a8076", fontWeight: 600, paddingBottom: 6, borderBottom: "1px solid #eee6db", fontSize: 13 }}>
