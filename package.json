@@ -1,0 +1,21 @@
+{
+  "name": "wall-paneling-planner",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Browser-based tool for designing decorative wall paneling and generating a cut list.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11",
+    "vite-plugin-singlefile": "^2.0.3"
+  }
+}
