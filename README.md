@@ -4,6 +4,9 @@ A single-file, browser-based tool for designing decorative wall paneling (wainsc
 
 No build step, no backend, no dependencies to install. It's one `index.html` file that runs entirely in the browser.
 
+
+View [Wall Paneling Planner](https://gusdeboer.github.io/wall-paneling-planner/)
+
 ---
 
 ## Live demo / hosting
@@ -171,4 +174,4 @@ For an instant-loading, CDN-free version, the same component can be built with *
 
 ## License
 
-Free to use and modify for personal projects. Add your own license here if you plan to share it publicly.
+Free to use and modify for personal projects.
